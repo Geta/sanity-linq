@@ -46,7 +46,8 @@ namespace Sanity.Linq.Tests
                 Tags = new[] { "Seven", "Eight", "Nine" },
                 Numbers = new[] { 7, 8, 9 },
                 Title = "Festivals",
-                InternalId = 3
+                InternalId = 3,
+                LocaleSlug = new SanityLocale<SanitySlug>("slug") { {"en", new SanitySlug("festivals") } }
             };
             await categories
                     .Create(category1)
@@ -79,6 +80,8 @@ namespace Sanity.Linq.Tests
             var result5 = await categories.Where(c => c.Numbers.Contains(c.InternalId)).ToListAsync();
             Assert.True(result5.Count == 1);
 
+            var result6 = await categories.Where(c => c.LocaleSlug.Get("en").Current == "festivals").ToListAsync();
+            Assert.True(result6.Count == 1);
         }
 
         [Fact]

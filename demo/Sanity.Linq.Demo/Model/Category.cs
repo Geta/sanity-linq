@@ -35,5 +35,7 @@ namespace Sanity.Linq.Demo.Model
 
         [Include]
         public SanityImage MainImage { get; set; }
+
+        public SanityLocale<SanitySlug> LocaleSlug { get; set; }
     }
 }

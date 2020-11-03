@@ -51,10 +51,10 @@ namespace Sanity.Linq
         public Type ResultType { get; }
 
         public string BuildQuery(bool includeProjections = true)
-        {            
+        {
             //Initialize query builder
             QueryBuilder = new SanityQueryBuilder();
-            
+
             // Add contraint for root type
             QueryBuilder.DocType = DocType;
             QueryBuilder.ResultType = ResultType ?? DocType;
@@ -70,7 +70,7 @@ namespace Sanity.Linq
             // Build query
             var query = QueryBuilder.Build(includeProjections, MaxNestingLevel);
             return query;
-                        
+
         }
 
 
@@ -259,7 +259,7 @@ namespace Sanity.Linq
                             return $"{memberName2} in {memberName1}";
                         }
                         throw new Exception("'Contains' is only supported for simple expressions with non-null values.");
-                        
+
                     }
                 case "GetValue`1":
                 case "GetValue":
@@ -464,6 +464,22 @@ namespace Sanity.Linq
                         }
                         throw new Exception("Format for Skip expression not supported.");
                     }
+
+                case "Get":
+                    {
+                        if (e.Arguments[0] is ConstantExpression languageCodeExpression
+                            && e.Object != null
+                            && e.Object is MemberExpression m
+                            && m.Type.IsGenericType
+                            && m.Type.GetGenericTypeDefinition() == typeof(SanityLocale<>))
+                        {
+                            var languageCode = languageCodeExpression.Value.ToString().ToLower();
+                            var memberName = m.Member.Name;
+                            return $"{memberName.ToCamelCase()}.{languageCode}.current";
+                        }
+
+                        throw new Exception("Format for Get expression not supported.");
+                    }
                 default:
                     {
                         throw new Exception($"Method call {e.Method.Name} not supported.");
@@ -495,6 +511,10 @@ namespace Sanity.Linq
                 var memberPath = new List<string>();
                 var member = m.Member;
 
+                if (member.Name == "Current" && member.DeclaringType == typeof(SanitySlug) && m.Expression is MethodCallExpression mc2)
+                {
+                    return TransformMethodCallExpression(mc2);
+                }
                 if (member.Name == "Value" && member.DeclaringType.IsGenericType && member.DeclaringType.GetGenericTypeDefinition() == typeof(SanityReference<>))
                 {
                     memberPath.Add("->");
@@ -515,14 +535,14 @@ namespace Sanity.Linq
                 {
                     memberPath.Add(TransformOperand(m.Expression));
                 }
-                
-                return memberPath.Aggregate((a1, a2) => a1 != "->" && a2 != "->" ? $"{a2}.{a1}" : $"{a2}{a1}").Replace(".->","->").Replace("->.","->");
+
+                return memberPath.Aggregate((a1, a2) => a1 != "->" && a2 != "->" ? $"{a2}.{a1}" : $"{a2}{a1}").Replace(".->", "->").Replace("->.", "->");
             }
 
             if (e is NewExpression nw)
             {
                 // New expression with support for nested news
-                var args = nw.Arguments.Select(arg => arg is NewExpression ? "{" +  TransformOperand(arg) + "}" : TransformOperand(arg)).ToArray();
+                var args = nw.Arguments.Select(arg => arg is NewExpression ? "{" + TransformOperand(arg) + "}" : TransformOperand(arg)).ToArray();
                 var props = nw.Members.Select(prop => prop.Name.ToCamelCase()).ToArray();
                 if (args.Length == props.Length)
                 {
@@ -625,7 +645,7 @@ namespace Sanity.Linq
             }
 
             var result = new List<string>();
-            
+
             // "Include all" primative types with a simple ...
             result.Add("...");
             foreach (var prop in props)
@@ -639,9 +659,9 @@ namespace Sanity.Linq
                     var fieldRef = targetName == sourceName ? sourceName : $"\"{targetName}\": {sourceName}";
                     bool isIncluded = includeAttr != null;
                     if (isIncluded)
-                    { 
+                    {
                         // Add a join projection for [Include]d properties
-                        result.Add(GetJoinProjection(sourceName, targetName, prop.PropertyType, nestingLevel+1, maxNestingLevel));
+                        result.Add(GetJoinProjection(sourceName, targetName, prop.PropertyType, nestingLevel + 1, maxNestingLevel));
                     }
                     else if (prop.PropertyType.IsClass && prop.PropertyType != typeof(string))
                     {
@@ -655,7 +675,7 @@ namespace Sanity.Linq
                             // Avoid recursion for special case of JObject
                             if (elementType != typeof(JObject))
                             {
-                                var fieldList = GetPropertyProjectionList(elementType, nestingLevel+1, maxNestingLevel);
+                                var fieldList = GetPropertyProjectionList(elementType, nestingLevel + 1, maxNestingLevel);
                                 var listItemProjection = fieldList.Aggregate((c, n) => c + "," + n);
                                 if (listItemProjection != "...")
                                 {
@@ -670,11 +690,11 @@ namespace Sanity.Linq
                                 result.Add($"{fieldRef}{{...}}");
                             }
                             // Object Case: Recursively add projection list for class types
-                            var fieldList = GetPropertyProjectionList(prop.PropertyType, nestingLevel+1, maxNestingLevel);
+                            var fieldList = GetPropertyProjectionList(prop.PropertyType, nestingLevel + 1, maxNestingLevel);
                             result.Add($"{fieldRef}{{{fieldList.Aggregate((c, n) => c + "," + n)}}}");
                         }
                     }
-                }                
+                }
             }
             return result;
         }
@@ -747,7 +767,7 @@ namespace Sanity.Linq
                             var propertyName = nestedSanityReferenceProperty.GetCustomAttribute<JsonPropertyAttribute>()?.PropertyName ?? nestedSanityReferenceProperty.Name.ToCamelCase();
                             var fields = GetPropertyProjectionList(propertyType, nestingLevel, maxNestingLevel);
                             var elementType = nestedSanityReferenceProperty.PropertyType.GetGenericArguments()[0];
-                            var nestedFields = GetPropertyProjectionList(elementType, nestingLevel+1, maxNestingLevel);
+                            var nestedFields = GetPropertyProjectionList(elementType, nestingLevel + 1, maxNestingLevel);
 
                             // Nested Reference
                             var fieldList = fields.Select(f => f == propertyName ? $"{propertyName}->{(nestedFields.Count > 0 ? ("{" + nestedFields.Aggregate((a, b) => a + "," + b) + "}") : "")}" : f).Aggregate((c, n) => c + "," + n);
@@ -766,22 +786,22 @@ namespace Sanity.Linq
                                 var fields = GetPropertyProjectionList(propertyType, nestingLevel, maxNestingLevel);
                                 var collectionType = nestedListOfSanityReferenceType.PropertyType.GetGenericArguments()[0];
                                 var elementType = collectionType.GetGenericArguments()[0];
-                                var nestedFields = GetPropertyProjectionList(elementType, nestingLevel+1, maxNestingLevel);
+                                var nestedFields = GetPropertyProjectionList(elementType, nestingLevel + 1, maxNestingLevel);
 
                                 // Nested Reference
                                 var fieldList = fields.Select(f => f == propertyName ? $"{propertyName}[]->{(nestedFields.Count > 0 ? ("{" + nestedFields.Aggregate((a, b) => a + "," + b) + "}") : "")}" : f).Aggregate((c, n) => c + "," + n);
                                 projection = $"{fieldRef}{{{fieldList}}}";
 
-                            } 
+                            }
                             else
                             {
-                                
+
                                 var listOfSanityImagesType = propertyType.GetInterfaces().FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>) && i.GetGenericArguments()[0].GetProperties().Any(p => p.PropertyType.IsGenericType && p.PropertyType.GetGenericTypeDefinition() == typeof(SanityReference<>) && (p.Name.ToLower() == "asset" || ((p.GetCustomAttributes<JsonPropertyAttribute>(true).FirstOrDefault())?.PropertyName?.Equals("asset")).GetValueOrDefault())));
                                 bool isListOfSanityImages = listOfSanityImagesType != null;
                                 if (isListOfSanityImages)
                                 {
                                     // CASE 6: Array of objects with "asset" field (e.g. images)                                    
-                                    var elementType = listOfSanityImagesType.GetGenericArguments()[0];                                    
+                                    var elementType = listOfSanityImagesType.GetGenericArguments()[0];
                                     var fields = GetPropertyProjectionList(elementType, nestingLevel, maxNestingLevel);
 
 
@@ -869,7 +889,7 @@ namespace Sanity.Linq
             public List<string> Orderings { get; set; } = new List<string>();
             public int Take { get; set; } = 0;
             public int Skip { get; set; } = 0;
-            public Dictionary<string,string> Includes { get; set; } = new Dictionary<string, string>();
+            public Dictionary<string, string> Includes { get; set; } = new Dictionary<string, string>();
 
 
 
@@ -946,8 +966,8 @@ namespace Sanity.Linq
 
                     // Add projection
                     if (!string.IsNullOrEmpty(projection))
-                    {                        
-                        projection = ExpandIncludesInProjection(projection, Includes);                       
+                    {
+                        projection = ExpandIncludesInProjection(projection, Includes);
                         projection = projection.Replace($"{{{SanityConstants.SPREAD_OPERATOR}}}", ""); // Remove redundant {...} to simplify query
                         if (projection != $"{{{SanityConstants.SPREAD_OPERATOR}}}") // Don't need to add an empty projection
                         {
@@ -1041,7 +1061,7 @@ namespace Sanity.Linq
                                     || property.Key.StartsWith($"{GroqTokens[SanityConstants.STRING_DELIMITOR]}{part}{GroqTokens[SanityConstants.STRING_DELIMITOR]}")
                                     || property.Key.StartsWith(part + GroqTokens[SanityConstants.ARRAY_INDICATOR])
                                     || property.Key.StartsWith(part + GroqTokens[SanityConstants.DEREFERENCING_OPERATOR]))
-                                { 
+                                {
                                     obj = obj[property.Key] as JObject;
                                     propertyExists = true;
                                     break;
@@ -1059,9 +1079,9 @@ namespace Sanity.Linq
                             var fieldsToReplace = new List<string>();
                             foreach (var property in obj)
                             {
-                                if (property.Key == part 
-                                    || property.Key.StartsWith($"{GroqTokens[SanityConstants.STRING_DELIMITOR]}{part}{GroqTokens[SanityConstants.STRING_DELIMITOR]}") 
-                                    || property.Key.StartsWith(part + GroqTokens[SanityConstants.ARRAY_INDICATOR]) 
+                                if (property.Key == part
+                                    || property.Key.StartsWith($"{GroqTokens[SanityConstants.STRING_DELIMITOR]}{part}{GroqTokens[SanityConstants.STRING_DELIMITOR]}")
+                                    || property.Key.StartsWith(part + GroqTokens[SanityConstants.ARRAY_INDICATOR])
                                     || property.Key.StartsWith(part + GroqTokens[SanityConstants.DEREFERENCING_OPERATOR]))
                                 {
                                     fieldsToReplace.Add(property.Key);
@@ -1104,7 +1124,7 @@ namespace Sanity.Linq
                     json = json.Replace(token, GroqTokens[token]);
                 }
                 json = json.Replace("{", ":{")
-                .TrimStart(':');                                
+                .TrimStart(':');
 
                 // Replace variable names with valid json (e.g. convert myField to "myField":true)
                 var reVariables = new Regex("(,|{)([^\"}:,]+)(,|})");
