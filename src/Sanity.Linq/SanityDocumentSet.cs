@@ -46,19 +46,19 @@ namespace Sanity.Linq
         /// <summary> 
         /// This constructor is called by the client to create the data source. 
         /// </summary> 
-        public SanityDocumentSet(SanityOptions options, int maxNestingLevel)
+        public SanityDocumentSet(SanityOptions options, int maxNestingLevel, bool excludeDocTypeConstraintInQuery = false)
         {
             MaxNestingLevel = maxNestingLevel;
             Context = new SanityDataContext(options, false);
-            Provider = new SanityQueryProvider(typeof(TDoc), Context, MaxNestingLevel);
+            Provider = new SanityQueryProvider(typeof(TDoc), Context, MaxNestingLevel, excludeDocTypeConstraintInQuery);
             Expression = Expression.Constant(this);
         }
 
-        public SanityDocumentSet(SanityDataContext context, int maxNestingLevel)
+        public SanityDocumentSet(SanityDataContext context, int maxNestingLevel, bool excludeDocTypeConstraintInQuery = false)
         {
             MaxNestingLevel = maxNestingLevel;
             Context = context;
-            Provider = new SanityQueryProvider(typeof(TDoc), context, MaxNestingLevel);
+            Provider = new SanityQueryProvider(typeof(TDoc), context, MaxNestingLevel, excludeDocTypeConstraintInQuery);
             Expression = Expression.Constant(this);
         }
 

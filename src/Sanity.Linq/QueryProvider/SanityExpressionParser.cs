@@ -35,17 +35,19 @@ namespace Sanity.Linq
     internal class SanityExpressionParser : ExpressionVisitor
     {
 
-        public SanityExpressionParser(Expression expression, Type docType, int maxNestingLevel, Type resultType = null)
+        public SanityExpressionParser(Expression expression, Type docType, int maxNestingLevel, Type resultType = null, bool excludeDocTypeConstraint = false)
         {
             Expression = expression;
             DocType = docType;
             ResultType = TypeSystem.GetElementType(resultType);
             MaxNestingLevel = maxNestingLevel;
+            ExcludeDocTypeConstraint = excludeDocTypeConstraint;
         }
 
 
         private SanityQueryBuilder QueryBuilder { get; set; } = new SanityQueryBuilder();
         public int MaxNestingLevel { get; set; }
+        public bool ExcludeDocTypeConstraint { get; }
         public Expression Expression { get; }
         public Type DocType { get; }
         public Type ResultType { get; }
@@ -56,7 +58,12 @@ namespace Sanity.Linq
             QueryBuilder = new SanityQueryBuilder();
 
             // Add contraint for root type
-            QueryBuilder.DocType = DocType;
+
+            if (!ExcludeDocTypeConstraint)
+            {
+                QueryBuilder.DocType = DocType;
+            }
+
             QueryBuilder.ResultType = ResultType ?? DocType;
 
             // Parse Query
@@ -474,7 +481,7 @@ namespace Sanity.Linq
                             && m.Type.GetGenericTypeDefinition() == typeof(SanityLocale<>))
                         {
                             var languageCode = languageCodeExpression.Value.ToString().ToLower();
-                            var memberName = m.Member.Name;
+                            var memberName = TransformOperand(m);
                             return $"{memberName.ToCamelCase()}.{languageCode}.current";
                         }
 

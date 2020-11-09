@@ -48,10 +48,23 @@ namespace Sanity.Linq
             {
                 return ((SanityQueryProvider)dbSet.Provider).GetSanityQuery<T>(source.Expression);
             }
-            else
+
+            throw new Exception("Queryable source must be a SanityDbSet<T>.");
+        }
+
+        public static string GetSanityQuery(this IQueryable<SanityDocument> source, Type resultType)
+        {
+            if (source == null)
             {
-                throw new Exception("Queryable source must be a SanityDbSet<T>.");
+                throw new ArgumentNullException(nameof(source));
             }
+
+            if (source.Provider is SanityQueryProvider sanityQueryProvider)
+            {
+                return sanityQueryProvider.GetSanityQuery(source.Expression, resultType);
+            }
+
+            throw new Exception("Query provider must be a SanityQueryProvider");
         }
 
         public static async Task<List<T>> ToListAsync<T>(this IQueryable<T> source, CancellationToken cancellationToken = default)

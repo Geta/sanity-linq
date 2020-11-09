@@ -93,14 +93,14 @@ namespace Sanity.Linq
         /// </summary>
         /// <typeparam name="TDoc"></typeparam>
         /// <returns></returns>
-        public virtual SanityDocumentSet<TDoc> DocumentSet<TDoc>(int maxNestingLevel = 7)
+        public virtual SanityDocumentSet<TDoc> DocumentSet<TDoc>(int maxNestingLevel = 7, bool excludeDocTypeConstraint = false)
         {
             var key = $"{typeof(TDoc)?.FullName ?? ""}_{maxNestingLevel}";
             lock (_dsLock)
             {
                 if (!_documentSets.ContainsKey(key))
                 {
-                    _documentSets[key] = new SanityDocumentSet<TDoc>(this, maxNestingLevel);
+                    _documentSets[key] = new SanityDocumentSet<TDoc>(this, maxNestingLevel, excludeDocTypeConstraint);
                 }
             }
             return _documentSets[key] as SanityDocumentSet<TDoc>;

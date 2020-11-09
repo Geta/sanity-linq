@@ -31,14 +31,16 @@ namespace Sanity.Linq
 {
     public class SanityQueryProvider : IQueryProvider
     {
+        private bool _excludeDocTypeConstraint;
         private object _queryBuilderLock = new object();
         public Type DocType { get; }
         public SanityDataContext Context { get; }
 
         public int MaxNestingLevel { get; }
 
-        public SanityQueryProvider(Type docType, SanityDataContext context, int maxNestingLevel)
+        public SanityQueryProvider(Type docType, SanityDataContext context, int maxNestingLevel, bool excludeDocTypeConstraint = false)
         {
+            _excludeDocTypeConstraint = excludeDocTypeConstraint;
             MaxNestingLevel = maxNestingLevel;
             DocType = docType;
             Context = context;
@@ -76,13 +78,19 @@ namespace Sanity.Linq
 
         public string GetSanityQuery<TResult>(Expression expression)
         {
-            var parser = new SanityExpressionParser(expression, DocType, MaxNestingLevel, typeof(TResult));
+            var parser = new SanityExpressionParser(expression, DocType, MaxNestingLevel, typeof(TResult), _excludeDocTypeConstraint);
+            return parser.BuildQuery();
+        }
+
+        public string GetSanityQuery(Expression expression, Type resultType)
+        {
+            var parser = new SanityExpressionParser(expression, DocType, MaxNestingLevel, resultType, _excludeDocTypeConstraint);
             return parser.BuildQuery();
         }
 
         public async Task<TResult> ExecuteAsync<TResult>(Expression expression, CancellationToken cancellationToken = default)
         {
-            var query = GetSanityQuery<TResult>(expression);          
+            var query = GetSanityQuery(expression, typeof(TResult));          
 
             // Execute query
             var result = await Context.Client.FetchAsync<TResult>(query, null, cancellationToken).ConfigureAwait(false);
@@ -91,7 +99,10 @@ namespace Sanity.Linq
 
         }
 
-      
+        public void ExcludeDocTypeConstraint()
+        {
+            _excludeDocTypeConstraint = true;
+        }
     }
 
 
